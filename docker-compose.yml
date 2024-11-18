@@ -1,0 +1,103 @@
+###### 톰캣 클러스터링 주요점
+# HTTP 커넥터 포트 (기본: 8080)
+# AJP 커넥터 포트 (기본: 8009)
+# Shutdown 포트 (기본: 8005)
+  # 클러스터링 멀티캐스트 포트 address="228.0.0.4" port="45564" [일반적으로 로컬 네트워크에서 사용되는 멀티캐스트 IP 대역(224.0.0.0 ~ 239.255.255.255)에 속합니다.]
+# Receiver 포트 port="4000"
+  # Tomcat 인스턴스는 자신의 Receiver 포트를 통해 세션 복제 및 클러스터 메시지를 수신
+
+
+
+# Tomcat 클러스터링 요약 정보
+# ----------------------------------------------------------------------
+# 서비스명   | 고정 IP        | HTTP 포트 (호스트:컨테이너) | 클러스터링 포트
+# ----------------------------------------------------------------------
+# nginx      | 172.20.0.10    | 8079:8079                      | -  
+# tomcat1    | 172.20.0.101     | 8081:8080                  | 4000 (자신의 Receiver포트), 4000(tomcat2의 수신포트를 설정했음)
+# tomcat2    | 172.20.0.102     | 8082:8080                  | 4000 (자신의 Receiver포트), 4000(tomcat1의 수신포트를 설정했음)
+# mysql      | 자동 할당      | 3306:3306                  | -  
+# redis      | 자동 할당      | 6379:6379                  | -  
+# ----------------------------------------------------------------------
+
+services:
+  # Nginx 로드밸런서 설정
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    platform: linux/arm64
+    ports:
+      - "8079:8079"
+    volumes:
+      - ./conf/nginx:/etc/nginx/conf.d  # Nginx 설정 파일 마운트
+    networks:
+      app-network:
+        ipv4_address: 172.20.0.10
+
+  # Tomcat 1 서버 설정
+  tomcat1:
+    image: tomcat:9.0
+    platform: linux/arm64
+    environment:
+      - CATALINA_OPTS=-DjvmRoute=tomcat1 -Dspring.redis.host=redis -Dspring.datasource.url=jdbc:mysql://mysql:3306/testdb
+    ports:
+      - "8081:8080"  # 호스트 포트 매핑 (옵션)
+    networks:
+      app-network:
+        ipv4_address: 172.20.0.101
+    volumes:
+      - ./conf/tomcat1:/usr/local/tomcat/conf  # Tomcat1의 클러스터링 설정
+      - ./webapps:/usr/local/tomcat/webapps    # 배포된 애플리케이션
+
+  # Tomcat 2 서버 설정
+  tomcat2:
+    image: tomcat:9.0
+    platform: linux/arm64
+    environment:
+      - CATALINA_OPTS=-DjvmRoute=tomcat2 -Dspring.redis.host=redis -Dspring.datasource.url=jdbc:mysql://mysql:3306/testdb
+    ports:
+      - "8082:8080"  # 호스트 포트 매핑 (옵션)
+    networks:
+      app-network:
+        ipv4_address: 172.20.0.102
+    volumes:
+      - ./conf/tomcat2:/usr/local/tomcat/conf  # Tomcat2의 클러스터링 설정
+      - ./webapps:/usr/local/tomcat/webapps    # 배포된 애플리케이션
+
+  # MySQL 데이터베이스 설정 (최신 버전 및 ARM64 설정 추가)
+  mysql:
+    image: mysql:8.0
+    platform: linux/arm64
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: testdb
+      MYSQL_USER: testuser
+      MYSQL_PASSWORD: testpassword
+    ports:
+      - "3306:3306"
+    networks:
+      - app-network
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  # Redis 세션 저장소 설정
+  redis:
+    image: redis:latest
+    platform: linux/arm64
+    ports:
+      - "6379:6379"
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16  # 고정 IP 사용을 위한 서브넷 설정
+
+#익명 볼륨을 생성할 때 사용되며, Docker가 자동으로 볼륨을 생성하여 사용
+volumes:
+  mysql_data:
+
+
+#docker network rm tomcat-zerodowntimepipeline_app-network
