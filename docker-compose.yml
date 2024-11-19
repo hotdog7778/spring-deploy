@@ -10,13 +10,15 @@
 
 # Tomcat 클러스터링 요약 정보
 # ----------------------------------------------------------------------
-# 서비스명   | 고정 IP        | HTTP 포트 (호스트:컨테이너) | 클러스터링 포트
+# 서비스명   | 고정 IP             | HTTP 포트 (호스트:컨테이너) | 클러스터링 포트
 # ----------------------------------------------------------------------
-# nginx      | 자동 할당    | 8010:8010                      | -
-# tomcat1    | 172.20.0.101     | 8081:8080                  | 4000 (자신의 Receiver포트), 4000(tomcat2의 수신포트를 설정했음) ..기본값임
-# tomcat2    | 172.20.0.102     | 8082:8080                  | 4000 (자신의 Receiver포트), 4000(tomcat1의 수신포트를 설정했음) ..기본값임
-# mysql      | 자동 할당      | 3306:3306                  | -  
-# redis      | 자동 할당      | 6379:6379                  | -  
+# nginx      | 자동 할당          | 8010:8010              | -
+# tomcat1    | 172.20.0.101     | 8081:8080              | 4000 (자신의 Receiver포트), 4000(tomcat2의 수신포트를 설정했음) ..기본값임
+# tomcat2    | 172.20.0.102     | 8082:8080              | 4000 (자신의 Receiver포트), 4000(tomcat1의 수신포트를 설정했음) ..기본값임
+# mysql      | 자동 할당          | 3306:3306              | -
+# redis      | 자동 할당          | 6379:6379              | -
+#
+# jenkins    | 자동 할당          | 8085:8080
 # ----------------------------------------------------------------------
 
 services:
@@ -28,8 +30,6 @@ services:
       - "8010:8010"
     volumes:
       - ./conf/nginx/nginx.conf:/etc/nginx/nginx.conf  # Nginx 설정 파일 마운트
-#    extra_hosts:
-#      - "host.docker.internal:host-gateway"
     networks:
       - app-network
 
@@ -40,12 +40,6 @@ services:
     platform: linux/arm64
     environment:
       - CATALINA_OPTS=-DjvmRoute=tomcat1 -Dspring.redis.host=redis -Dspring.datasource.url=jdbc:mysql://mysql:3306/testdb
-#    build:
-#      context: .
-#      args:
-#        conf: /Users/tgkim/jenkins/tomcat-ZeroDowntimePipeline/tomcat1/conf
-#        warpath: /Users/tgkim/jenkins/tomcat-ZeroDowntimePipeline/target/spring-cluster-webapp-1.0-SNAPSHOT.war
-#      dockerfile: ./DockerfileTomcat
     ports:
       - "8081:8080"  # 호스트 포트 매핑 (옵션)
     networks:
@@ -53,22 +47,14 @@ services:
         ipv4_address: 172.20.0.101
     volumes:
       - ./tomcat1/conf/server.xml:/usr/local/tomcat/conf/server.xml  # Tomcat1의 클러스터링 설정
-#      - /host_mnt/Users/tgkim/jenkins/tomcat-ZeroDowntimePipeline/tomcat2/conf/server.xml:/usr/local/tomcat/conf/server.xml
-      #- ./target:/usr/local/tomcat/webapps    # 배포된 애플리케이션
-      - ./target/ROOT-1.0-SNAPSHOT.war:/usr/local/tomcat/webapps/ROOT.war
       - ./tomcat1/logs:/usr/local/tomcat/logs  # Tomcat1의 로그 폴더
+      - ./target/ROOT-1.0-SNAPSHOT.war:/usr/local/tomcat/webapps/ROOT.war
 
   # Tomcat 2 서버 설정
   tomcat2:
 #    <<: *was
     image: tomcat:9.0
     platform: linux/arm64
-#    build:
-#      context: .
-#      args:
-#        conf: /Users/tgkim/jenkins/tomcat-ZeroDowntimePipeline/tomcat2/conf
-#        warpath: /Users/tgkim/jenkins/tomcat-ZeroDowntimePipeline/target/spring-cluster-webapp-1.0-SNAPSHOT.war
-#      dockerfile: ./DockerfileTomcat
     environment:
       - CATALINA_OPTS=-DjvmRoute=tomcat2 -Dspring.redis.host=redis -Dspring.datasource.url=jdbc:mysql://mysql:3306/testdb
     ports:
@@ -78,9 +64,8 @@ services:
         ipv4_address: 172.20.0.102
     volumes:
       - ./tomcat2/conf/server.xml:/usr/local/tomcat/conf/server.xml  # Tomcat2의 클러스터링 설정
-      #- ./target:/usr/local/tomcat/webapps    # 배포된 애플리케이션
-      - ./target/ROOT-1.0-SNAPSHOT.war:/usr/local/tomcat/webapps/ROOT.war
       - ./tomcat2/logs:/usr/local/tomcat/logs  # Tomcat2의 로그 폴더
+      - ./target/ROOT-1.0-SNAPSHOT.war:/usr/local/tomcat/webapps/ROOT.war
 
   # MySQL 데이터베이스 설정 (최신 버전 및 ARM64 설정 추가)
   mysql:
@@ -106,6 +91,24 @@ services:
       - "6379:6379"
     networks:
       - app-network
+
+  jenkins:
+    #image: jenkins/jenkins:lts
+    image: custom-jenkins
+    platform: linux/arm64
+    user: root
+    #environment:
+      #JAVA_OPTS: "-Djenkins.install.runSetupWizard=false" #플러그인설치 스킵
+    ports:
+      - "8085:8080"  # Jenkins 웹 인터페이스 포트
+      - "50000:50000"  # Jenkins 에이전트 포트
+    networks:
+      - app-network
+    volumes:
+      - ./data/jenkins/jenkins_home:/var/jenkins_home  # Jenkins 데이터 저장
+      - /var/run/docker.sock:/var/run/docker.sock  # 젠킨스에서 도커작업이 필요할경우
+#    extra_hosts:
+#      - "host.docker.internal:172.20.0.1"  # 호스트 IP 매핑
 
 networks:
   app-network:
