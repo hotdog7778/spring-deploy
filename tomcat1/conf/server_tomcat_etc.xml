@@ -1,15 +1,15 @@
-<Engine name="Catalina" defaultHost="localhost" jvmRoute="tomcat1">
+<Engine name="Catalina" defaultHost="localhost" jvmRoute="tomcat2">
     <Cluster className="org.apache.catalina.ha.tcp.SimpleTcpCluster">
         <Channel className="org.apache.catalina.tribes.group.GroupChannel">
             <Membership className="org.apache.catalina.tribes.membership.StaticMembership">
                 <Member className="org.apache.catalina.tribes.membership.StaticMember"
-                        port="4001" 
-                        securePort="-1" 
-                        host="172.20.0.102" /> <!-- tomcat2의 고정 IP -->
+                        port="4001"
+                        securePort="-1"
+                        host="172.20.0.101" /> <!-- tomcat1의 고정 IP -->
             </Membership>
             <Receiver className="org.apache.catalina.tribes.transport.nio.NioReceiver"
                       address="auto"
-                      port="4000"  
+                      port="4002"
                       autoBind="100"
                       selectorTimeout="5000"
                       maxThreads="6"/> <!-- 리시버 포트: 도커에서는 동일해도 되나 하나의 호스트에 도커가아니게 실행시 포트 변경할것 -->

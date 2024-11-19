@@ -12,9 +12,9 @@
 # ----------------------------------------------------------------------
 # 서비스명   | 고정 IP        | HTTP 포트 (호스트:컨테이너) | 클러스터링 포트
 # ----------------------------------------------------------------------
-# nginx      | 172.20.0.10    | 8079:8079                      | -  
-# tomcat1    | 172.20.0.101     | 8081:8080                  | 4000 (자신의 Receiver포트), 4000(tomcat2의 수신포트를 설정했음)
-# tomcat2    | 172.20.0.102     | 8082:8080                  | 4000 (자신의 Receiver포트), 4000(tomcat1의 수신포트를 설정했음)
+# nginx      | 자동 할당    | 8010:8010                      | -
+# tomcat1    | 172.20.0.101     | 8081:8080                  | 4000 (자신의 Receiver포트), 4000(tomcat2의 수신포트를 설정했음) ..기본값임
+# tomcat2    | 172.20.0.102     | 8082:8080                  | 4000 (자신의 Receiver포트), 4000(tomcat1의 수신포트를 설정했음) ..기본값임
 # mysql      | 자동 할당      | 3306:3306                  | -  
 # redis      | 자동 할당      | 6379:6379                  | -  
 # ----------------------------------------------------------------------
@@ -23,35 +23,52 @@ services:
   # Nginx 로드밸런서 설정
   nginx:
     image: nginx:latest
-    container_name: nginx
     platform: linux/arm64
     ports:
-      - "8079:8079"
+      - "8010:8010"
     volumes:
-      - ./conf/nginx:/etc/nginx/conf.d  # Nginx 설정 파일 마운트
+      - ./conf/nginx/nginx.conf:/etc/nginx/nginx.conf  # Nginx 설정 파일 마운트
+#    extra_hosts:
+#      - "host.docker.internal:host-gateway"
     networks:
-      app-network:
-        ipv4_address: 172.20.0.10
+      - app-network
 
   # Tomcat 1 서버 설정
+  #tomcat1: &was
   tomcat1:
     image: tomcat:9.0
     platform: linux/arm64
     environment:
       - CATALINA_OPTS=-DjvmRoute=tomcat1 -Dspring.redis.host=redis -Dspring.datasource.url=jdbc:mysql://mysql:3306/testdb
+#    build:
+#      context: .
+#      args:
+#        conf: /Users/tgkim/jenkins/tomcat-ZeroDowntimePipeline/tomcat1/conf
+#        warpath: /Users/tgkim/jenkins/tomcat-ZeroDowntimePipeline/target/spring-cluster-webapp-1.0-SNAPSHOT.war
+#      dockerfile: ./DockerfileTomcat
     ports:
       - "8081:8080"  # 호스트 포트 매핑 (옵션)
     networks:
       app-network:
         ipv4_address: 172.20.0.101
     volumes:
-      - ./conf/tomcat1:/usr/local/tomcat/conf  # Tomcat1의 클러스터링 설정
-      - ./webapps:/usr/local/tomcat/webapps    # 배포된 애플리케이션
+      - ./tomcat1/conf/server.xml:/usr/local/tomcat/conf/server.xml  # Tomcat1의 클러스터링 설정
+#      - /host_mnt/Users/tgkim/jenkins/tomcat-ZeroDowntimePipeline/tomcat2/conf/server.xml:/usr/local/tomcat/conf/server.xml
+      #- ./target:/usr/local/tomcat/webapps    # 배포된 애플리케이션
+      - ./target/ROOT-1.0-SNAPSHOT.war:/usr/local/tomcat/webapps/ROOT.war
+      - ./tomcat1/logs:/usr/local/tomcat/logs  # Tomcat1의 로그 폴더
 
   # Tomcat 2 서버 설정
   tomcat2:
+#    <<: *was
     image: tomcat:9.0
     platform: linux/arm64
+#    build:
+#      context: .
+#      args:
+#        conf: /Users/tgkim/jenkins/tomcat-ZeroDowntimePipeline/tomcat2/conf
+#        warpath: /Users/tgkim/jenkins/tomcat-ZeroDowntimePipeline/target/spring-cluster-webapp-1.0-SNAPSHOT.war
+#      dockerfile: ./DockerfileTomcat
     environment:
       - CATALINA_OPTS=-DjvmRoute=tomcat2 -Dspring.redis.host=redis -Dspring.datasource.url=jdbc:mysql://mysql:3306/testdb
     ports:
@@ -60,8 +77,10 @@ services:
       app-network:
         ipv4_address: 172.20.0.102
     volumes:
-      - ./conf/tomcat2:/usr/local/tomcat/conf  # Tomcat2의 클러스터링 설정
-      - ./webapps:/usr/local/tomcat/webapps    # 배포된 애플리케이션
+      - ./tomcat2/conf/server.xml:/usr/local/tomcat/conf/server.xml  # Tomcat2의 클러스터링 설정
+      #- ./target:/usr/local/tomcat/webapps    # 배포된 애플리케이션
+      - ./target/ROOT-1.0-SNAPSHOT.war:/usr/local/tomcat/webapps/ROOT.war
+      - ./tomcat2/logs:/usr/local/tomcat/logs  # Tomcat2의 로그 폴더
 
   # MySQL 데이터베이스 설정 (최신 버전 및 ARM64 설정 추가)
   mysql:
@@ -101,3 +120,4 @@ volumes:
 
 
 #docker network rm tomcat-zerodowntimepipeline_app-network
+#docker compose -f /path/to/docker-compose.yml down --volumes
