@@ -42,13 +42,15 @@ services:
       - CATALINA_OPTS=-DjvmRoute=tomcat1 -Dspring.redis.host=redis -Dspring.datasource.url=jdbc:mysql://mysql:3306/testdb
     ports:
       - "8081:8080"  # 호스트 포트 매핑 (옵션)
+      - "8005:8005"
     networks:
       app-network:
         ipv4_address: 172.20.0.101
     volumes:
       - ./tomcat1/conf/server.xml:/usr/local/tomcat/conf/server.xml  # Tomcat1의 클러스터링 설정
       - ./tomcat1/logs:/usr/local/tomcat/logs  # Tomcat1의 로그 폴더
-      - ./target/ROOT-1.0-SNAPSHOT.war:/usr/local/tomcat/webapps/ROOT.war
+      #- ./target/ROOT-1.0-SNAPSHOT.war:/usr/local/tomcat/webapps/ROOT.war
+      - ./tomcat1/webapp/ROOT.war:/usr/local/tomcat/webapps/ROOT.war # 배포 테스트용
 
   # Tomcat 2 서버 설정
   tomcat2:
@@ -59,6 +61,7 @@ services:
       - CATALINA_OPTS=-DjvmRoute=tomcat2 -Dspring.redis.host=redis -Dspring.datasource.url=jdbc:mysql://mysql:3306/testdb
     ports:
       - "8082:8080"  # 호스트 포트 매핑 (옵션)
+      - "8006:8005"
     networks:
       app-network:
         ipv4_address: 172.20.0.102

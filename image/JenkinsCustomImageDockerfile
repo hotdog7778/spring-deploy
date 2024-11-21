@@ -1,0 +1,7 @@
+FROM jenkins/jenkins:lts
+
+USER root
+RUN apt-get update && apt-get install -y docker.io netcat
+USER jenkins
+
+# 이미지 빌드: docker build -t custom-jenkins .

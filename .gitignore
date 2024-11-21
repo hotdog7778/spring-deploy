@@ -50,6 +50,8 @@ build/
 
 target
 tomcat1/logs
+tomcat1/webapp
 tomcat2/logs
+tomcat2/webapp
 
 data/
